@@ -1,19 +1,32 @@
-import random
+import socket
+
 from cluster import hosts
 
-# Function to start the leader election process
-def start_leader_election(server_list, myIP):
-    try:
-        # Exclude the current leader from the election
-        server_list.remove(hosts.current_leader)
-    except ValueError:
-        pass
-    
-    try:
-        my_index = server_list.index(myIP)
-        if my_index < len(server_list) - 1:
-            return server_list[my_index + 1]
+
+def form_ring(members):
+    sorted_binary_ring = sorted([socket.inet_aton(member) for member in members])
+    sorted_ip_ring = [socket.inet_ntoa(node) for node in sorted_binary_ring]
+    return sorted_ip_ring
+
+
+def get_neighbour(members, current_member_ip, direction='left'):
+    current_member_index = members.index(current_member_ip) if current_member_ip in members else -1
+    if current_member_index != -1:
+        if direction == 'left':
+            if current_member_index + 1 == len(members):
+                return members[0]
+            else:
+                return members[current_member_index + 1]
         else:
-            return server_list[0]
-    except ValueError:
-        return random.choice(server_list)
+            if current_member_index - 1 == 0:
+                return members[0]
+            else:
+                return members[current_member_index - 1]
+    else:
+        return None
+
+
+def start_leader_election(server_list, leader_server):
+    ring = form_ring(server_list)
+    neighbour = get_neighbour(ring, leader_server, 'right')
+    return neighbour if neighbour != hosts.myIP else None
